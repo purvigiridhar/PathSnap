@@ -1,0 +1,3 @@
+split,candidate_bearing_observations,candidate_bearing_reference_misses,candidate_bearing_reference_miss_rate,full_track_observations,zero_candidate_observations,zero_candidate_rate,full_track_reference_misses,full_track_reference_miss_rate
+train,208417,18905,0.0907075718391494,208417,0,0.0,18905,0.0907075718391494
+student_test,19160,68,0.0035490605427974946,19160,0,0.0,68,0.0035490605427974946
