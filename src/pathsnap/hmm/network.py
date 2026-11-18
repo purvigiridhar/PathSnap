@@ -19,8 +19,9 @@ class ArcGraph:
     """NetworkX-backed directed graph indexed by the input ``arc_id`` values.
 
     Node IDs are their zero-based row positions in ``nodes``; arc IDs are their
-    zero-based row positions in ``arcs``. Node coordinates are projected from
-    WGS84 longitude/latitude into ``coord_crs`` at construction time.
+    zero-based row positions in ``arcs``. Node coordinates are either taken
+    from projected ``x``/``y`` columns or projected from WGS84 longitude and
+    latitude into ``coord_crs`` at construction time.
     """
 
     def __init__(
@@ -28,8 +29,10 @@ class ArcGraph:
         nodes: pd.DataFrame,
         arcs: pd.DataFrame,
         coord_crs: str = "EPSG:32632",
+        *,
+        nodes_are_projected: bool = False,
     ) -> None:
-        required_nodes = {"lon", "lat"}
+        required_nodes = {"x", "y"} if nodes_are_projected else {"lon", "lat"}
         required_arcs = {"from_node_id", "to_node_id"}
         if not required_nodes.issubset(nodes.columns):
             raise ValueError(f"nodes must contain {sorted(required_nodes)}")
@@ -43,11 +46,19 @@ class ArcGraph:
             raise ValueError("coord_crs must be a projected CRS whose units are metres")
         self.coord_crs = crs
 
-        lon = nodes["lon"].to_numpy(dtype=float)
-        lat = nodes["lat"].to_numpy(dtype=float)
-        if not np.isfinite(lon).all() or not np.isfinite(lat).all():
-            raise ValueError("node longitude and latitude values must be finite")
-        node_x, node_y = _transformer(str(crs)).transform(lon, lat, errcheck=True)
+        if nodes_are_projected:
+            node_x = nodes["x"].to_numpy(dtype=float)
+            node_y = nodes["y"].to_numpy(dtype=float)
+            if not np.isfinite(node_x).all() or not np.isfinite(node_y).all():
+                raise ValueError("projected node coordinates must be finite")
+        else:
+            lon = nodes["lon"].to_numpy(dtype=float)
+            lat = nodes["lat"].to_numpy(dtype=float)
+            if not np.isfinite(lon).all() or not np.isfinite(lat).all():
+                raise ValueError("node longitude and latitude values must be finite")
+            node_x, node_y = _transformer(str(crs)).transform(
+                lon, lat, errcheck=True
+            )
         self._node_xy = {
             node_id: (float(x), float(y))
             for node_id, (x, y) in enumerate(zip(node_x, node_y))

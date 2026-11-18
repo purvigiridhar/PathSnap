@@ -33,6 +33,16 @@ table. An observation with no candidate row between those bounds returns
 `None`. Leading and trailing observations with no candidate rows cannot be
 recovered without the original GPS track.
 
+The Stage 2 `reconstruct_trip()` adapter loads the full track and expands this
+candidate-range result to the original track length, using `None` for leading,
+internal, and trailing observations with no candidates. It invokes P1's
+label-free `build_candidates_for_trip()` and `load_projected_network()` using
+the candidate table's `coord_crs`. P2's probability function is passed into the
+adapter and receives the P1 candidate rows with any `label` column removed.
+Scores must be one-dimensional, finite probabilities in `[0, 1]`, and remain
+aligned with the original candidate-row order. The adapter also removes
+`label` before calling the P3 decoder.
+
 ## 4. API (P4)
 `GET /trips` -> list of the ten evaluation trip IDs
 `POST /predict {"trip_id": "..."}` -> `{predicted_route, per_obs_arcs, metrics, latency_ms}`
