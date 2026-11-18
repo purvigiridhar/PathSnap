@@ -15,18 +15,21 @@ One row per (GPS observation, candidate arc). Saved as parquet in `data/processe
 | label | Reference-candidate target: 1 when `arc_id` matches the aligned reference arc for the observation, otherwise 0. Present only in offline training and student-test development data; never used by the decoder |
 
 P1 aligns observations in file order to nondecreasing positions in the
-reference route by minimizing total point-to-segment distance; observations
-may repeat a route position or skip forward. Candidate generation and feature
-engineering use GPS and network files. An observation with no candidate arcs
-has no candidate row, so it cannot have a positive candidate label; partition
-miss summaries count such observations among all observations.
+reference route by minimizing total point-to-segment distance. Observations
+may repeat a route position or skip forward. P1 generates candidates and
+features from GPS and network files before attaching labels. A candidate miss
+produces no candidate row (and therefore no positive row) for that observation;
+partition summaries count misses over all observations, including those with
+zero candidates.
 
 The GPS positions, network nodes, and metric features for a trip use the same
 projected, metre-based CRS. `coord_crs` identifies that CRS and must agree
 between candidate coordinates and the network used by the decoder. Candidate
 rows and scores must remain aligned one-to-one in their original row order;
 attach scores before sorting or grouping by `obs_idx`. The decoder ignores
-`label`.
+`label`. For inference, use P1's label-free `build_candidates_for_trip()`;
+`load_projected_network(trip_dir, crs)` returns projected nodes, directed arcs,
+and their CRS while preserving original file-row node and arc IDs.
 
 Fit models on training trips only. Student-test labels are for offline
 development evaluation; prediction must use the label-free candidate builder.
@@ -36,8 +39,15 @@ Evaluator references are reserved for final scoring.
 `model.predict_proba(X_features) -> np.ndarray` of shape (n_rows,) = P(candidate is correct).
 Saved with joblib along with the fitted preprocessing. Models that don't give probabilities need a documented adaptation.
 
+Score at position `i` belongs to candidate row at position `i`. Attach scores before sorting or grouping by `obs_idx`.
+
+Use `group_kfold_by_trip(train_table["trip_id"])` from `pathsnap.data.splits` to obtain the shared training/validation row positions. Reuse those folds for each model and fit model preprocessing within each training fold.
+
 ## 3. Decoder (P3 produces, API consumes)
-`decode(trip_candidates, scores, network) -> list[int]` one predicted arc_id per observation (or None if no candidate).
+Pass the full GPS track separately from the candidate table. The decoder returns
+one arc ID per original track row, using `None` where there are no candidates.
+`load_projected_network(trip_dir, crs)` returns projected nodes, directed arcs,
+and their CRS. Node and arc IDs are their original file row indices.
 
 `network` is a directed `ArcGraph`, constructed from the trip's nodes and arcs
 using the same target CRS as the candidate x/y coordinates. The result covers
@@ -60,3 +70,5 @@ aligned with the original candidate-row order. The adapter also removes
 `GET /trips` -> list of the ten evaluation trip IDs
 `POST /predict {"trip_id": "..."}` -> `{predicted_route, per_obs_arcs, metrics, latency_ms}`
 Ground truth is looked up server-side only.
+
+Use `build_candidates_for_trip(trip_dir)` for label-free prediction inputs. It uses the same deterministic feature calculations and configured shortlist as the batch build. Any learned preprocessing belongs in the saved P2 model pipeline.
