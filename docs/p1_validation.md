@@ -59,3 +59,27 @@ reference for a decoder choosing only among these candidates.
 
 See [data quality and alignment limitations](data_quality_log.md) and
 [feature definitions](features.md).
+
+## Heading feature comparison
+
+For a development check, fit the same histogram gradient boosting classifier
+twice with 40 iterations and seed 42, using the same 250,000 randomly sampled
+candidate rows from the 80 training trips. The two runs used geometry alone or
+geometry plus the heading difference and validity flag. On the 10 student-test
+trips, choosing the highest-scoring arc per observation gave **50.23%** and
+**78.54%** top-1 agreement with the aligned reference, respectively.
+
+Among student-test observations whose reference arc was shortlisted, the
+fraction with a negative candidate identical across all model features dropped
+from **26.30%** to **0.91%**. The candidate lists and miss counts stayed the same.
+The label-free batch and single-trip inference builds produced identical feature
+values on the checked trip.
+
+## Expanded feature comparison
+
+Repeating the same controlled comparison with the four heading-baseline
+features and then all 19 features gave **78.54%** and **85.79%** student-test
+top-1 agreement, respectively. Both fits used the same 250,000 sampled training
+rows, 40 histogram gradient boosting iterations, and seed 42. The rebuilt
+training and student-test tables retained their previous candidate miss counts.
+The checked single-trip inference output matched its label-free batch table.
