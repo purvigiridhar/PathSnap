@@ -6,8 +6,8 @@ paths:
   processed: data/processed
   models: models
 candidates:
-  radius_m: null      # decide from EDA
-  max_candidates: null
+  radius_m: null      # expand the spatial search until the nearest candidates are found
+  max_candidates: 8
 cv:
   n_splits: 5         # GroupKFold by trip_id
 primary_metric: null  # choose and justify (e.g. macro F1); document in report
