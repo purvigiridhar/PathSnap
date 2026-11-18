@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
 
 import folium
 import numpy as np
@@ -26,7 +27,9 @@ def _route_chains(
     """Make lat/lon line chains without drawing connectors across gaps."""
     longitudes = nodes["lon"].to_numpy(dtype=float)
     latitudes = nodes["lat"].to_numpy(dtype=float)
-    endpoints = arcs[["from_node_id", "to_node_id"]].to_numpy(dtype=float)
+    u_col = "from_node_id" if "from_node_id" in arcs.columns else "u"
+    v_col = "to_node_id" if "to_node_id" in arcs.columns else "v"
+    endpoints = arcs[[u_col, v_col]].to_numpy(dtype=float)
     if not np.isfinite(endpoints).all() or np.any(endpoints != np.floor(endpoints)):
         raise ValueError("Arc endpoint IDs must be finite integers")
     chains: list[list[tuple[float, float]]] = []
@@ -103,15 +106,17 @@ def _add_route_layer(
 
 def make_trip_map(
     trip_id,
-    track,
-    nodes,
-    arcs,
+    track=None,
+    nodes=None,
+    arcs=None,
     reference_route=None,
     predicted_route=None,
     out_html=None,
     *,
     classifier_route=None,
     hmm_route=None,
+    pred_arcs=None,
+    max_net_arcs=None,
 ):
     """Create and optionally save a map of GPS and directed route layers.
 
@@ -119,6 +124,28 @@ def make_trip_map(
     drawn from its ``from_node_id`` to ``to_node_id`` node. Disconnected arcs
     and missing predicted arcs are kept as separate line segments.
     """
+    # Convenience loader if first arg is trip directory
+    if isinstance(trip_id, (str, Path)) and (track is None or nodes is None or arcs is None):
+        trip_dir = Path(trip_id)
+        t_id = trip_dir.name
+        from pathsnap.data.loader import load_track, load_nodes, load_arcs, load_route
+        track = load_track(trip_dir)
+        nodes = load_nodes(trip_dir)
+        arcs = load_arcs(trip_dir)
+        try:
+            route_df = load_route(trip_dir)
+            reference_route = route_df["arc_id"].tolist()
+        except Exception:
+            reference_route = None
+        if pred_arcs is not None and predicted_route is None:
+            predicted_route = pred_arcs
+        trip_id = t_id
+
+    u_col = "from_node_id" if "from_node_id" in arcs.columns else "u"
+    v_col = "to_node_id" if "to_node_id" in arcs.columns else "v"
+    if u_col != "from_node_id" or v_col != "to_node_id":
+        arcs = arcs.rename(columns={u_col: "from_node_id", v_col: "to_node_id"})
+
     required_track = {"lon", "lat"}
     required_nodes = {"lon", "lat"}
     required_arcs = {"from_node_id", "to_node_id"}
@@ -136,7 +163,13 @@ def make_trip_map(
     if not np.isfinite(gps_lon).all() or not np.isfinite(gps_lat).all():
         raise ValueError("GPS longitude and latitude must be finite")
     center = [float(np.mean(gps_lat)), float(np.mean(gps_lon))]
-    fmap = folium.Map(location=center, zoom_start=13, control_scale=True)
+    fmap = folium.Map(
+        location=center,
+        zoom_start=13,
+        control_scale=True,
+        tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+        attr="Esri"
+    )
 
     gps_layer = folium.FeatureGroup(name="GPS trace", show=True)
     folium.PolyLine(
