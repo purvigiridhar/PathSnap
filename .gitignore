@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# Secrets - never commit
+.env
+*.key
+*.pem
+secrets*
+
+# Raw / large data (keep dataset out of git; document how to place it in data/raw/)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# NEVER commit evaluator data or labels
+data/evaluator/
+**/evaluator_*
+
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/settings.json

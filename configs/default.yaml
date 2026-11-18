@@ -1,0 +1,13 @@
+seed: 42
+crs_projected: "EPSG:32632"   # UTM 32N; verify against the data extent
+paths:
+  raw_train: data/raw/train
+  raw_student_test: data/raw/student_test
+  processed: data/processed
+  models: models
+candidates:
+  radius_m: null      # decide from EDA
+  max_candidates: null
+cv:
+  n_splits: 5         # GroupKFold by trip_id
+primary_metric: null  # choose and justify (e.g. macro F1); document in report
