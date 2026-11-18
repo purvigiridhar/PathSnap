@@ -37,7 +37,7 @@ Raw data is git-ignored.
 
 ## Running (fill in as you build)
 1. EDA: `notebooks/01_eda.ipynb`
-2. Build candidates/features: `python -m pathsnap.build_dataset`   (TODO)
+2. Build a trip's candidates: `python -m pathsnap.build_dataset data/raw/train/00000002 data/processed/00000002.parquet --max-candidates 8`
 3. Train + compare models: `python -m pathsnap.models.train`        (TODO)
 4. Bayesian tuning: `python -m pathsnap.tuning.bayes_opt`            (TODO)
 5. HMM comparison: `python -m pathsnap.hmm.compare`                  (TODO)
