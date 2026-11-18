@@ -42,3 +42,9 @@ Results are written to `models/baseline_tuned.joblib`, `results/tuned_vs_untuned
 - Untuned full-refit student-test top-1 accuracy: 85.87%.
 - Tuned student-test top-1 accuracy: 85.76%.
 - `results/model_comparison.csv` and the matching files in `experiments/logs/` contain model comparison and fold details.
+
+## Metric scope and reconciled student-test results
+
+`results/model_comparison.csv` evaluates each classifier after fitting it on the 250,000-row CV sample; its HGB student-test top-1 result is 86.01%. This is a sample-fit comparison score, not the final baseline result. `results/full_fit_student_test.csv` evaluates the selected HGB after refitting on all 1,667,336 labeled training rows; its top-1 result is 85.87%. These are different fitted models on the same student-test partition, so the scores are not contradictory. The full-data refit is the baseline handoff to P3.
+
+The reference-arc miss metric is the share of observations with candidate rows for which no candidate has label 1. The current result files compute it over candidate-bearing observations. The full-track report separately counts GPS observations without any candidate rows and reports reference-arc misses over all GPS observations. On the current P1 outputs, candidate rows cover every GPS point: train has 0/208,417 zero-candidate observations, and student-test has 0/19,160. Thus the miss rates happen to match for these data: train 18,905/208,417 (9.07%); student-test 68/19,160 (0.35%). See `results/candidate_coverage.csv`.
