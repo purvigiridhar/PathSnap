@@ -2,7 +2,7 @@ numpy
 pandas
 pyarrow
 scipy
-scikit-learn
+scikit-learn>=1.6
 lightgbm
 optuna
 pyproj

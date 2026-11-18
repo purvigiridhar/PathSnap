@@ -8,13 +8,22 @@ import pandas as pd
 from pyarrow.parquet import read_schema
 
 from pathsnap.candidates import generate_candidates
+from pathsnap.config import load_config
 from pathsnap.data.alignment import align_reference
 from pathsnap.data.loader import list_trips, load_arcs, load_nodes, load_route, load_track
 from pathsnap.features import build_features
 from pathsnap.geo import local_metric_crs, project_lonlat
 
 
+def build_candidates_for_trip(trip_dir):
+    """Build label-free model inputs with the shared batch preprocessing settings."""
+    options = load_config()["candidates"]
+    candidates, _ = build_trip(trip_dir, local_crs=True, **options)
+    return candidates
+
+
 def build_trip(trip_dir, *, max_candidates, radius_m=None, local_crs=False, labeled=False):
+    trip_dir = Path(trip_dir)
     if labeled and trip_dir.resolve().parent.name not in {"train", "student_test"}:
         raise ValueError("Labels are only supported for offline train and student_test trips")
     track, nodes, arcs = (load(trip_dir) for load in (load_track, load_nodes, load_arcs))
@@ -49,11 +58,12 @@ def build_trip(trip_dir, *, max_candidates, radius_m=None, local_crs=False, labe
 
 
 def main():
+    options = load_config()["candidates"]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("trip_dir", type=Path)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--radius-m", type=float)
-    parser.add_argument("--max-candidates", type=int, required=True)
+    parser.add_argument("--radius-m", type=float, default=options["radius_m"])
+    parser.add_argument("--max-candidates", type=int, default=options["max_candidates"])
     parser.add_argument("--partition", action="store_true", help="Input and output are directories")
     parser.add_argument("--local-crs", action="store_true", help="Use a trip-centred metric projection")
     parser.add_argument("--labeled", action="store_true",

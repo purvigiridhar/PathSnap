@@ -72,6 +72,25 @@ server-side for final scoring. See the [P1 validation run](docs/p1_validation.md
 The single-trip command accepts a trip directory and a Parquet output path.
 Its default CRS is EPSG:32632.
 
+For API inference, call `build_candidates_for_trip(trip_dir)` from
+`pathsnap.build_dataset`. It uses the candidate settings in
+`configs/default.yaml` and the same trip-centred projection as the batch
+commands above. It reads the track, nodes, and arcs.
+
+```python
+from pathsnap.build_dataset import build_candidates_for_trip
+from pathsnap.data.loader import load_track
+from pathsnap.data.network import load_projected_network
+
+candidates = build_candidates_for_trip(trip_dir)
+track = load_track(trip_dir)
+nodes, arcs, crs = load_projected_network(trip_dir)
+```
+
+Pass the full track to the decoder so it can return a result for each
+observation. To load the network for a table built with an explicit CRS, pass
+that table's `coord_crs` to `load_projected_network`.
+
 ## Rules we follow
 - Evaluator-test data/labels are never used for training, features, thresholds or model/decoder choice.
 - All preprocessing is fit on training trips only; CV is `GroupKFold` by trip.

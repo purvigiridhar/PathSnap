@@ -27,10 +27,17 @@ Saved with joblib along with the fitted preprocessing. Models that don't give pr
 
 Score at position `i` belongs to candidate row at position `i`. Attach scores before sorting or grouping by `obs_idx`.
 
+Use `group_kfold_by_trip(train_table["trip_id"])` from `pathsnap.data.splits` to obtain the shared training/validation row positions. Reuse those folds for each model and fit model preprocessing within each training fold.
+
 ## 3. Decoder (P3 produces, API consumes)
-`decode(trip_candidates, scores, network) -> list[int]` one predicted arc_id per observation (or None if no candidate).
+Pass the full GPS track separately from the candidate table. The decoder returns
+one arc ID per original track row, using `None` where there are no candidates.
+`load_projected_network(trip_dir, crs)` returns projected nodes, directed arcs,
+and their CRS. Node and arc IDs are their original file row indices.
 
 ## 4. API (P4)
 `GET /trips` -> list of the ten evaluation trip IDs
 `POST /predict {"trip_id": "..."}` -> `{predicted_route, per_obs_arcs, metrics, latency_ms}`
 Ground truth is looked up server-side only.
+
+Use `build_candidates_for_trip(trip_dir)` for label-free prediction inputs. It uses the same deterministic feature calculations and configured shortlist as the batch build. Any learned preprocessing belongs in the saved P2 model pipeline.
