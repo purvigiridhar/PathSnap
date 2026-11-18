@@ -1,0 +1,16 @@
+emission:
+  log_floor: -10.0
+  normalize_per_observation: false
+
+transition:
+  mode: hop
+  beta: 1.0
+  max_distance_m: 5000.0
+  same_arc_bonus: 0.0
+  hop_penalty: 1.0
+  max_hops: 5
+  unreachable_log_penalty: -10.0
+  gap_threshold_s: 30.0
+  uturn:
+    enabled: false
+    penalty: -5.0
