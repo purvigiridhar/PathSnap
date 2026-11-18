@@ -16,6 +16,14 @@ def project_lonlat(lon, lat, crs: str = "EPSG:32632"):
     return _transformer(crs).transform(lon, lat, errcheck=True)
 
 
+def local_metric_crs(lon, lat) -> str:
+    """Center a metric projection on the observed trip."""
+    angles = np.radians(lon)
+    center_lon = np.degrees(np.arctan2(np.sin(angles).mean(), np.cos(angles).mean()))
+    center_lat = np.median(lat)
+    return f"+proj=aeqd +lat_0={center_lat:.8f} +lon_0={center_lon:.8f} +datum=WGS84 +units=m"
+
+
 def point_to_segment_distance(px, py, ax, ay, bx, by):
     """Return the distance from P to the closed segment AB in coordinate units."""
     dx = bx - ax

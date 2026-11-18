@@ -6,7 +6,7 @@ scikit-learn
 lightgbm
 optuna
 pyproj
-shapely
+shapely>=2
 networkx
 folium
 matplotlib
