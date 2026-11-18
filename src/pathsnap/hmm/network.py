@@ -66,6 +66,9 @@ class ArcGraph:
 
         self._arc_endpoints: dict[int, tuple[int, int]] = {}
         self._arc_lengths: dict[int, float] = {}
+        self._hop_distance_cache: dict[
+            tuple[int, int, float | None, int | None], int | None
+        ] = {}
         self._outgoing: dict[int, list[int]] = {
             node_id: [] for node_id in self._node_xy
         }
@@ -146,35 +149,72 @@ class ArcGraph:
         arc_a: int,
         arc_b: int,
         max_distance_m: float | None = None,
+        *,
+        max_hops: int | None = None,
     ) -> int | None:
         """Return shortest directed connector hops plus the final transition.
 
         A directly adjacent arc pair has distance 1; the same arc has distance
         0. When bounded, only connector paths whose total projected length is
-        at most ``max_distance_m`` are considered.
+        at most ``max_distance_m`` and whose transition count is at most
+        ``max_hops`` are considered.
         """
         if max_distance_m is not None and (
             not np.isfinite(max_distance_m) or max_distance_m < 0
         ):
             raise ValueError("max_distance_m must be finite and nonnegative")
-        if int(arc_a) == int(arc_b):
+        if max_hops is not None and (
+            not isinstance(max_hops, (int, np.integer))
+            or isinstance(max_hops, (bool, np.bool_))
+            or max_hops < 1
+        ):
+            raise ValueError("max_hops must be a positive integer")
+        arc_a, arc_b = int(arc_a), int(arc_b)
+        distance_bound = (
+            None if max_distance_m is None else float(max_distance_m)
+        )
+        hop_bound = None if max_hops is None else int(max_hops)
+        cache_key = (arc_a, arc_b, distance_bound, hop_bound)
+        if cache_key in self._hop_distance_cache:
+            return self._hop_distance_cache[cache_key]
+
+        if arc_a == arc_b:
+            self._hop_distance_cache[cache_key] = 0
             return 0
 
-        _, source = self._arc_endpoints[int(arc_a)]
-        target, _ = self._arc_endpoints[int(arc_b)]
+        _, source = self._arc_endpoints[arc_a]
+        target, _ = self._arc_endpoints[arc_b]
         if source == target:
+            self._hop_distance_cache[cache_key] = 1
             return 1
-        if max_distance_m is None:
-            try:
-                connector_hops = nx.shortest_path_length(
-                    self._node_graph, source, target
+        if distance_bound is None:
+            if hop_bound is None:
+                try:
+                    connector_hops = nx.shortest_path_length(
+                        self._node_graph, source, target
+                    )
+                except nx.NetworkXNoPath:
+                    result = None
+                else:
+                    result = int(connector_hops) + 1
+            else:
+                distances = nx.single_source_shortest_path_length(
+                    self._node_graph, source, cutoff=hop_bound - 1
                 )
-            except nx.NetworkXNoPath:
-                return None
-            return int(connector_hops) + 1
+                connector_hops = distances.get(target)
+                result = (
+                    None
+                    if connector_hops is None
+                    else int(connector_hops) + 1
+                )
+            self._hop_distance_cache[cache_key] = result
+            return result
 
         distances = {source: 0.0}
-        for connector_hops in range(1, len(self._node_graph)):
+        max_connector_hops = len(self._node_graph) - 1
+        if hop_bound is not None:
+            max_connector_hops = min(max_connector_hops, hop_bound - 1)
+        for connector_hops in range(1, max_connector_hops + 1):
             next_distances: dict[int, float] = {}
             for node_id, distance_m in distances.items():
                 for successor in self._node_graph.successors(node_id):
@@ -182,15 +222,19 @@ class ArcGraph:
                         distance_m
                         + self._node_graph[node_id][successor]["length_m"]
                     )
-                    if next_distance > max_distance_m:
+                    if next_distance > distance_bound:
                         continue
                     if next_distance < next_distances.get(successor, np.inf):
                         next_distances[successor] = next_distance
             if target in next_distances:
-                return connector_hops + 1
+                result = connector_hops + 1
+                self._hop_distance_cache[cache_key] = result
+                return result
             if not next_distances:
+                self._hop_distance_cache[cache_key] = None
                 return None
             distances = next_distances
+        self._hop_distance_cache[cache_key] = None
         return None
 
     def same_arc_distance_m(

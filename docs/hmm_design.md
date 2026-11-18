@@ -92,3 +92,93 @@ scores, distance-ratio weight and bound, the shared unreachable penalty,
 time-gap threshold, and optional U-turn handling. The initial defaults are for
 deterministic Stage 1 behavior; they have not been tuned on real or evaluator
 data.
+
+## Classifier-only comparison and evaluation
+
+Run the development evaluation from the repository root:
+
+```powershell
+.\.venv\Scripts\python.exe -m pathsnap.hmm.compare `
+  --raw-dir data\raw\student_test `
+  --model models\baseline.joblib `
+  --saved-predictions-dir results\hmm\student_test `
+  --output-dir results\evaluation\student_test `
+  --map-dir results\maps\student_test
+```
+
+Both approaches receive the same label-free P1 candidate rows and P2 scores.
+Classifier-only independently selects the highest score per observation,
+breaking ties by original candidate row order. HMM uses the existing Viterbi
+decoder. Reference `.route` files are read only after both predictions and
+aligned to GPS observations using P1's `align_reference()` for evaluation.
+
+The evaluation writes per-trip and aggregate CSVs under
+`results/evaluation/student_test/`. Arc accuracy is correct directed arc IDs
+divided by all GPS observations, so a missing prediction counts as incorrect.
+Conditional accuracy uses only nonmissing predictions. Candidate reference
+coverage is the fraction of all observations whose P1-aligned reference arc is
+among that observation's candidates. Direct connectivity counts adjacent
+predicted observations where arcs are the same or immediate directed
+successors. Route continuity uses the configured maximum hop count to test for
+a directed path between the predicted arcs; disconnected-transition rate is
+its complement. Both connectivity rates use only adjacent original observation
+pairs with predictions at both ends. Missing observations are never bridged.
+An undefined zero-denominator rate is written as `NaN`.
+
+### Student-test results
+
+The measured student-test run includes 10 trips and 19,160 observations.
+Classifier-only achieved 16,452 correct arcs (85.866%); HMM achieved 16,934
+(88.382%), an increase of 482 correct observations or 2.516 percentage points.
+Both produced zero missing predictions. P1 candidate reference coverage was
+99.645% (68 of 19,160 observations had no reference-matching candidate).
+Direct connectivity was 92.762% for classifier-only and 97.645% for HMM.
+Continuity within the configured five-hop bound was 97.493% and 99.896%,
+respectively, with 480 versus 20 disconnected transitions.
+
+These are results on the provided student-test development references, not
+evaluator data or an independent ground-truth source. The comparison measures
+agreement with the route-to-observation alignment produced by P1; it should
+not be interpreted as a guarantee of geographic route accuracy. In particular,
+zero missing predictions alone is not evidence of correctness.
+
+The run reported exact row-for-row parity between newly decoded HMM outputs
+and all ten existing files in `results/hmm/student_test/`. Those PR #8
+prediction files are read-only inputs and are not overwritten. New outputs
+include `per_trip_metrics.csv`, `aggregate_metrics.csv`, `comparison.csv`, and
+`profile.csv`. Folium HTML maps are stored separately under
+`results/maps/student_test/`.
+
+Maps contain togglable GPS, reference `.route`, classifier-only, and HMM
+layers. Route geometry is assembled from directed `.arcs` endpoints and
+original WGS84 `.nodes` coordinates. Since the dataset stores arc endpoints
+rather than detailed polylines, the map draws endpoint-to-endpoint segments;
+it does not claim higher-resolution road shape. Missing predictions and
+disconnected arcs remain visually separated.
+
+## Performance investigation
+
+The profile isolates candidate generation/features, P2 scoring, ArcGraph
+construction, classifier selection, Viterbi decoding, transition calls,
+shortest-path work, evaluation, and map generation in `profile.csv`.
+For trip `00000056` (3,958 observations, 31,664 candidates), the current
+profile measured candidate generation at 0.472 s, P2 scoring at 0.046 s,
+ArcGraph construction at 0.265 s, and HMM decoding at 8.403 s. The decoder
+made 253,248 transition calls and 226,886 hop-distance calls; memoization
+resulted in 35,221 underlying shortest-path searches and 38,348 cached pair
+entries. HMM output matched the saved PR #8 result exactly.
+
+An earlier unoptimized profile of this same trip measured 143.04 s in the
+decoder, with 131.05 s in repeated hop-distance queries. `ArcGraph` now caches
+directed hop queries (including unreachable pairs), and hop-mode queries honor
+the configured `max_hops` bound. Focused decoder tests passed and the saved
+prediction parity check remained exact after the optimization. Runtime values
+are machine-dependent; the CSV profile is the source for the specific run.
+
+## P4 handoff
+
+`reconstruct_trip(trip_dir, predictor, model)` remains the trip-level
+integration entry point. It returns one directed arc ID or `None` for each
+original GPS observation index. P4 should consume this full-track sequence;
+reference routes and candidate labels are not part of inference. The current
+HTTP contract remains documented in `docs/interfaces.md`.
