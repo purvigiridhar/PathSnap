@@ -8,6 +8,9 @@ One row per (GPS observation, candidate arc). Saved as parquet in `data/processe
 | trip_id | trip identifier (group key for CV) |
 | obs_idx | 0-based index of the GPS point within the trip |
 | arc_id | candidate arc (0-based row index in the trip's `.arcs`) |
+| t | GPS observation timestamp in seconds, copied from `.track` |
+| x | GPS observation easting in metres (EPSG:32632) |
+| y | GPS observation northing in metres (EPSG:32632) |
 | feat_* | engineered features (document each in `docs/features.md`) |
 | label | 1 if arc_id equals the reference arc for that observation, else 0 (train/dev only) |
 
