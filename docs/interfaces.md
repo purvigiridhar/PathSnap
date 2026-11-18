@@ -36,13 +36,12 @@ development evaluation; prediction must use the label-free candidate builder.
 Evaluator references are reserved for final scoring.
 
 ## 2. Model (P2 produces, P3 and API consume)
-`model.predict_proba(X_features) -> np.ndarray` of shape (n_rows,) = P(candidate is correct).
-Saved with joblib along with the fitted preprocessing. Models that don't give probabilities need a documented adaptation.
 
-Score at position `i` belongs to candidate row at position `i`. Attach scores before sorting or grouping by `obs_idx`.
+`pathsnap.models.predict.predict_candidate_probabilities(candidate_rows, model="models/baseline.joblib")` returns a one-dimensional NumPy array with exactly one `P(candidate is correct)` score per input row. Output position `i` always corresponds to input row `i`; the function does not sort, filter, or drop candidates. Scores are independent per row and are not normalized across an observation.
 
-Use `group_kfold_by_trip(train_table["trip_id"])` from `pathsnap.data.splits` to obtain the shared training/validation row positions. Reuse those folds for each model and fit model preprocessing within each training fold.
+The joblib artifact stores the fitted preprocessing/model pipeline, positive label, and ordered `feat_*` feature columns. Prediction passes only those stored feature columns to the estimator and ignores any `label` column. P3 may use these scores as emission likelihoods or normalize them according to its decoder design.
 
+The selected baseline is trained on labeled training candidates only. Student-test labels are used for development metrics only; evaluator labels are not used for training, model selection, or tuning.
 ## 3. Decoder (P3 produces, API consumes)
 Pass the full GPS track separately from the candidate table. The decoder returns
 one arc ID per original track row, using `None` where there are no candidates.

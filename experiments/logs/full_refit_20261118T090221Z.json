@@ -1,0 +1,42 @@
+{
+  "created_utc": "20261118T090221Z",
+  "model_name": "hist_gradient_boosting",
+  "feature_columns": [
+    "feat_dist_m",
+    "feat_arc_length_m",
+    "feat_heading_diff_deg",
+    "feat_heading_valid",
+    "feat_projection_ratio",
+    "feat_dist_to_start_m",
+    "feat_dist_to_end_m",
+    "feat_dist_to_midpoint_m",
+    "feat_gps_speed_mps",
+    "feat_heading_cos_sim",
+    "feat_spatial_likelihood",
+    "feat_rank_by_dist",
+    "feat_is_closest",
+    "feat_speed_length_ratio",
+    "feat_dist_above_best_m",
+    "feat_start_in_degree",
+    "feat_end_out_degree",
+    "feat_prev_dist_m",
+    "feat_next_dist_m"
+  ],
+  "selection_metric": "mean_group_cv_macro_f1",
+  "cv_sample_path": "data/processed/offline/p2_cv_sample.parquet",
+  "cv_sample_rows": 250000,
+  "cv_macro_f1": 0.8936494368794478,
+  "cv_top1_accuracy": 0.7506441234359503,
+  "full_train_path": "data/processed/offline/train",
+  "full_train_rows": 1667336,
+  "training_trips": 80,
+  "full_fit_seconds": 68.10659690000102,
+  "student_test_path": "data/processed/offline/student_test",
+  "student_test_metrics": {
+    "candidate_accuracy": 0.9637134655532359,
+    "macro_f1": 0.9159970047401362,
+    "log_loss": 0.09440577089106388,
+    "top1_accuracy": 0.8586638830897704,
+    "candidate_miss_rate": 0.0035490605427974946
+  }
+}

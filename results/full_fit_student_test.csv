@@ -1,0 +1,2 @@
+model,training_rows,features,candidate_accuracy,macro_f1,log_loss,top1_accuracy,candidate_bearing_reference_miss_rate
+hist_gradient_boosting,1667336,19,0.9637134655532359,0.9159970047401362,0.09440577089106388,0.8586638830897704,0.0035490605427974946
