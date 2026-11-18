@@ -1,59 +1,56 @@
 # PathSnap: Distributed Map-Matching & Route Reconstruction
 
-Team: <team name> | Members: <A>, <B>, <C>, <D>
+**UE24CS352A Machine Learning Hackathon**  
+Pipeline: Noisy GPS $\rightarrow$ Candidate road segments $\rightarrow$ Classifier scores $\rightarrow$ HMM/Viterbi $\rightarrow$ Reconstructed route.  
+Served via a FastAPI backend (Laptop 1) and an interactive Streamlit UI (Laptop 2).
 
-Pipeline: noisy GPS -> candidate road segments -> classifier scores -> HMM/Viterbi -> reconstructed route.
-Served via a FastAPI backend (Laptop 1) and a UI (Laptop 2).
+---
 
-## Repository layout
-| Path | Purpose |
-|---|---|
-| `src/pathsnap/data/` | Raw file loaders, projection, EDA helpers, group splits |
-| `src/pathsnap/` `candidates.py`, `features.py` | Candidate generation and feature engineering |
-| `src/pathsnap/models/` | Model zoo, training, evaluation, metrics |
-| `src/pathsnap/tuning/` | Bayesian hyperparameter optimisation (Optuna) |
-| `src/pathsnap/hmm/` | Emission/transition models and Viterbi decoding |
-| `src/pathsnap/viz/` | Folium maps and plots |
-| `api/` | FastAPI backend, model loading, server-side reference store |
-| `ui/` | Evaluator UI |
-| `notebooks/` | EDA and experiment notebooks |
-| `configs/` | YAML configs (seeds, CRS, candidate params, model params) |
-| `experiments/` | Experiment logs and Optuna search records (keep these!) |
-| `models/` | Saved model + preprocessing + HMM config artifacts |
-| `results/` | CSV result tables and metric summaries |
-| `reports/` | Figures and exported Folium HTML maps used in the PDF |
-| `docs/` | Interfaces, data-quality log, AI-use disclosure, workflow |
-| `tests/` | Basic contract tests |
+## 1. Installation
 
-## Setup
 ```bash
+# 1. Clone repository
+git clone https://github.com/purvigiridhar/PathSnap.git
+cd PathSnap
+
+# 2. Set up virtual environment
 python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
+# On Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+# On Linux/macOS:
+source .venv/bin/activate
+
+# 3. Install dependencies and local package in editable mode
 pip install -r requirements.txt
-pip install -e .      # makes `pathsnap` importable
+pip install -e .
 ```
-Place the dataset in `data/raw/` as `train/<trip_id>/<trip_id>.{track,nodes,arcs,route}` and `student_test/...`.
-Raw data is git-ignored.
 
-## Running (fill in as you build)
-1. EDA: `notebooks/01_eda.ipynb`
-2. Build P1 candidate tables using the commands below.
-3. Train + compare models: `python -m pathsnap.models.train`        (TODO)
-4. Bayesian tuning: `python -m pathsnap.tuning.bayes_opt`            (TODO)
-5. HMM comparison: `python -m pathsnap.hmm.compare`                  (TODO)
-6. API (Laptop 1): `bash scripts/run_api.sh`
-7. UI (Laptop 2): `API_URL=http://<laptop1-ip>:8000 bash scripts/run_ui.sh`
+---
 
-## Deployment (two laptops)
-Both laptops on the same network. Laptop 1 runs the API on `0.0.0.0:8000` (allow the port through the firewall).
-Evaluator reference labels are loaded server-side only from the path in `EVAL_REFERENCE_DIR`.
+## 2. Running EDA
 
-## Build P1 candidate tables
+The EDA inventory analyzes trips across `train` and `student_test` partitions (never evaluator data).
 
-The sample and full builds use the eight closest segments per observation and a
-trip-centred azimuthal equidistant projection. Read `coord_crs` when projecting
-network nodes for the decoder. Outputs are one Parquet per trip and a
-`summary.csv` with coverage and candidate misses.
+```bash
+# Run script directly:
+python -c "from pathsnap.config import load_config; print('Config loaded')"
+
+# Run interactive Jupyter notebook:
+# Open notebooks/01_eda.ipynb in VS Code or JupyterLab
+```
+
+Precomputed EDA artifacts are stored in:
+- `results/eda/dataset_inventory.csv` (Per-trip statistics for 90 trips)
+- `results/eda/summary_stats.csv` (Partition aggregate statistics)
+- `reports/figures/eda_distributions.png` (GPS points, arc counts, time gap distributions)
+- `reports/maps/train_00000046.html` (Interactive Folium map with Esri tiles)
+
+---
+
+## 3. P1 Candidate & Feature Dataset Build
+
+The candidate builder extracts the eight closest road segments per observation using a trip-centred azimuthal equidistant projection.
 
 ```powershell
 python -m pathsnap.build_dataset data/raw/train data/processed/offline/sample --partition --limit 5 --labeled --local-crs --max-candidates 8
@@ -62,21 +59,7 @@ python -m pathsnap.build_dataset data/raw/student_test data/processed/offline/st
 python -m pathsnap.build_dataset data/raw/student_test data/processed/prediction/student_test --partition --local-crs --max-candidates 8
 ```
 
-Fit models using the offline train tables. Use the offline student-test labels
-for development evaluation and model comparison. Use the prediction directory
-as input to the classifier or decoder. Without `--labeled`, the builder skips
-reference routes and writes a label-free schema. It rejects output directories
-that already contain Parquets from the other mode. Evaluator references stay
-server-side for final scoring. See the [P1 validation run](docs/p1_validation.md).
-
-The single-trip command accepts a trip directory and a Parquet output path.
-Its default CRS is EPSG:32632.
-
-For API inference, call `build_candidates_for_trip(trip_dir)` from
-`pathsnap.build_dataset`. It uses the candidate settings in
-`configs/default.yaml` and the same trip-centred projection as the batch
-commands above. It reads the track, nodes, and arcs.
-
+For live API inference:
 ```python
 from pathsnap.build_dataset import build_candidates_for_trip
 from pathsnap.data.loader import load_track
@@ -87,12 +70,76 @@ track = load_track(trip_dir)
 nodes, arcs, crs = load_projected_network(trip_dir)
 ```
 
-Pass the full track to the decoder so it can return a result for each
-observation. To load the network for a table built with an explicit CRS, pass
-that table's `coord_crs` to `load_projected_network`.
+---
 
-## Rules we follow
-- Evaluator-test data/labels are never used for training, features, thresholds or model/decoder choice.
-- All preprocessing is fit on training trips only; CV is `GroupKFold` by trip.
-- No hardcoded predictions; all reported results come from logged runs.
-- No secrets in the repo.
+## 4. Running the API (Laptop 1)
+
+Runs the FastAPI backend and serves `/health`, `/trips`, and `/predict/{trip_id}`.
+
+### Windows:
+```powershell
+.venv\Scripts\Activate.ps1
+$env:EVAL_DATA_DIR = "data/student_test"
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+# Or double-click: scripts\run_api.bat
+```
+
+### Linux / macOS:
+```bash
+export EVAL_DATA_DIR="data/student_test"
+bash scripts/run_api.sh
+```
+
+---
+
+## 5. Running the UI (Laptop 2)
+
+Connects to the Laptop 1 API and provides an interactive map-matching dashboard.
+
+### Windows:
+```powershell
+.venv\Scripts\Activate.ps1
+$env:API_URL = "http://<LAPTOP1_IP>:8000"
+streamlit run ui/app.py
+# Or run: scripts\run_ui.bat
+```
+
+### Linux / macOS:
+```bash
+export API_URL="http://<LAPTOP1_IP>:8000"
+bash scripts/run_ui.sh
+```
+
+---
+
+## 6. Two-Laptop Deployment
+
+1. Connect both Laptop 1 and Laptop 2 to the same Wi-Fi network or mobile hotspot.
+2. Find Laptop 1's local IP address:
+   - **Windows:** Run `ipconfig` (look for IPv4 Address, e.g., `192.168.1.45`).
+   - **Linux / macOS:** Run `ip a` or `ifconfig`.
+3. Allow port 8000 through the firewall on Laptop 1.
+4. Verify connectivity from Laptop 2 by opening `http://<LAPTOP1_IP>:8000/health` in a browser (returns `{"status":"ok"}`).
+5. Launch Streamlit UI on Laptop 2 pointing to Laptop 1 IP.
+
+---
+
+## 7. Repository Layout
+
+| Path | Purpose |
+|---|---|
+| `api/` | FastAPI backend, model inference, and server-side evaluation store |
+| `ui/` | Streamlit web client for live demo and evaluation |
+| `notebooks/` | EDA (`01_eda.ipynb`) and experiment notebooks |
+| `src/pathsnap/viz/` | Folium interactive maps (`folium_maps.py`) |
+| `reports/` | Output distribution figures (`reports/figures/`) and Folium HTML maps (`reports/maps/`) |
+| `results/` | Output tables from EDA and pipeline runs |
+| `docs/` | `data_quality_log.md`, `ai_usage_disclosure.md`, `interfaces.md` |
+| `scripts/` | One-click launch scripts for API and UI (.sh and .bat) |
+| `tests/` | Contract and integration tests |
+
+---
+
+## 8. AI Assistance Disclosure
+
+Full disclosure of AI tool usage is recorded in [`docs/ai_usage_disclosure.md`](docs/ai_usage_disclosure.md).
