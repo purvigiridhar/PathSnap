@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from pyarrow.parquet import read_schema
 
 from pathsnap.candidates import generate_candidates
 from pathsnap.data.alignment import align_reference
@@ -14,6 +15,8 @@ from pathsnap.geo import local_metric_crs, project_lonlat
 
 
 def build_trip(trip_dir, *, max_candidates, radius_m=None, local_crs=False, labeled=False):
+    if labeled and trip_dir.resolve().parent.name not in {"train", "student_test"}:
+        raise ValueError("Labels are only supported for offline train and student_test trips")
     track, nodes, arcs = (load(trip_dir) for load in (load_track, load_nodes, load_arcs))
     lon, lat = track["lon"].to_numpy(), track["lat"].to_numpy()
     crs = local_metric_crs(lon, lat) if local_crs else "EPSG:32632"
@@ -53,7 +56,8 @@ def main():
     parser.add_argument("--max-candidates", type=int, required=True)
     parser.add_argument("--partition", action="store_true", help="Input and output are directories")
     parser.add_argument("--local-crs", action="store_true", help="Use a trip-centred metric projection")
-    parser.add_argument("--labeled", action="store_true", help="Use reference routes from student data")
+    parser.add_argument("--labeled", action="store_true",
+                        help="Build offline labels for train or student_test only")
     parser.add_argument("--limit", type=int, help="Build only the first N trips of a partition")
     args = parser.parse_args()
     if args.max_candidates < 1:
@@ -69,6 +73,15 @@ def main():
             parser.error("No trips found in partition")
     else:
         trips = [args.trip_dir]
+
+    output_dir = args.output if args.partition else args.output.parent
+    existing = set(output_dir.glob("*.parquet"))
+    if not args.partition and args.output.is_file():
+        existing.add(args.output)
+    for path in sorted(existing):
+        if ("label" in read_schema(path).names) != args.labeled:
+            parser.error(f"{path} uses the other label mode. Choose a separate output directory.")
+
     summaries = []
     for trip in trips:
         candidates, summary = build_trip(

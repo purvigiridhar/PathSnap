@@ -13,13 +13,19 @@ One row per (GPS observation, candidate arc). Saved as parquet in `data/processe
 | y | GPS observation projected y coordinate in metres |
 | coord_crs | CRS definition shared by every row in the trip. Use the same CRS to project network nodes for HMM transitions. |
 | feat_* | engineered features (document each in `docs/features.md`) |
-| label | 1 if arc_id equals the reference arc for that observation, else 0 (train/dev only) |
+| label | 1 if arc_id equals the reference arc for that observation, else 0. Present only in offline train and student-test development evaluation tables. |
 
 P1 baseline for team review. Align observations in file order to nondecreasing positions in the reference route by minimizing total point-to-segment distance. Observations can repeat a position or skip forward. Generate candidates and features from GPS and network files, then attach the label. A candidate miss produces no positive row for that observation. The partition summary counts misses over all observations, including those with zero candidates.
+
+Fit models on training trips only. Use student-test labels for offline development evaluation. Prediction uses the label-free build. Evaluator references are reserved for final scoring.
+
+The GPS positions, road-network nodes, and metric features use the same trip CRS. Each row of `.arcs` is a directed segment. If both directions occur, each direction has its own arc ID.
 
 ## 2. Model (P2 produces, P3 and API consume)
 `model.predict_proba(X_features) -> np.ndarray` of shape (n_rows,) = P(candidate is correct).
 Saved with joblib along with the fitted preprocessing. Models that don't give probabilities need a documented adaptation.
+
+Score at position `i` belongs to candidate row at position `i`. Attach scores before sorting or grouping by `obs_idx`.
 
 ## 3. Decoder (P3 produces, API consumes)
 `decode(trip_candidates, scores, network) -> list[int]` one predicted arc_id per observation (or None if no candidate).

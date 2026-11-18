@@ -56,13 +56,21 @@ network nodes for the decoder. Outputs are one Parquet per trip and a
 `summary.csv` with coverage and candidate misses.
 
 ```powershell
-python -m pathsnap.build_dataset data/raw/train data/processed/sample --partition --limit 5 --labeled --local-crs --max-candidates 8
-python -m pathsnap.build_dataset data/raw/train data/processed/train --partition --labeled --local-crs --max-candidates 8
-python -m pathsnap.build_dataset data/raw/student_test data/processed/student_test --partition --labeled --local-crs --max-candidates 8
+python -m pathsnap.build_dataset data/raw/train data/processed/offline/sample --partition --limit 5 --labeled --local-crs --max-candidates 8
+python -m pathsnap.build_dataset data/raw/train data/processed/offline/train --partition --labeled --local-crs --max-candidates 8
+python -m pathsnap.build_dataset data/raw/student_test data/processed/offline/student_test --partition --labeled --local-crs --max-candidates 8
+python -m pathsnap.build_dataset data/raw/student_test data/processed/prediction/student_test --partition --local-crs --max-candidates 8
 ```
 
+Fit models using the offline train tables. Use the offline student-test labels
+for development evaluation and model comparison. Use the prediction directory
+as input to the classifier or decoder. Without `--labeled`, the builder skips
+reference routes and writes a label-free schema. It rejects output directories
+that already contain Parquets from the other mode. Evaluator references stay
+server-side for final scoring. See the [P1 validation run](docs/p1_validation.md).
+
 The single-trip command accepts a trip directory and a Parquet output path.
-Its default CRS is EPSG:32632. Omit `--labeled` for prediction inputs.
+Its default CRS is EPSG:32632.
 
 ## Rules we follow
 - Evaluator-test data/labels are never used for training, features, thresholds or model/decoder choice.
