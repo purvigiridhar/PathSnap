@@ -11,6 +11,7 @@ Separate U-turn case:
 
 from itertools import product
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
@@ -212,6 +213,8 @@ def test_weighted_directed_path_distance_and_bound():
     assert network.arc_length_m(2) == pytest.approx(30.0, abs=1e-3)
     assert network.path_length_m(0, 1) == pytest.approx(100.0, abs=1e-3)
     assert network.hop_distance(0, 1) == 3
+    assert network.hop_distance(0, 1, max_hops=2) is None
+    assert network.hop_distance(0, 1, max_hops=3) == 3
     assert network.hop_distance(0, 1, max_distance_m=101.0) == 4
     assert network.hop_distance(0, 1, max_distance_m=99.0) is None
     assert network.path_length_m(0, 1, max_distance_m=99.0) is None
@@ -219,6 +222,29 @@ def test_weighted_directed_path_distance_and_bound():
         100.0, abs=1e-3
     )
     assert network.path_length_m(1, 0) is None
+
+
+def test_hop_distance_caches_unreachable_directed_pair(monkeypatch):
+    network = _network(
+        [(0, 0), (1, 0), (2, 0), (3, 0)],
+        [(0, 1), (2, 3)],
+    )
+    calls = 0
+    shortest_path_length = nx.shortest_path_length
+
+    def counted_shortest_path_length(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return shortest_path_length(*args, **kwargs)
+
+    monkeypatch.setattr(
+        "pathsnap.hmm.network.nx.shortest_path_length",
+        counted_shortest_path_length,
+    )
+
+    assert network.hop_distance(0, 1) is None
+    assert network.hop_distance(0, 1) is None
+    assert calls == 1
 
 
 def test_hop_parameters_are_independent_of_distance_ratio_bound():

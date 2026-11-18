@@ -56,7 +56,9 @@ def transition_log_score(
         if same_arc:
             score = same_arc_bonus
         else:
-            hops = network.hop_distance(previous_arc, current_arc)
+            hops = network.hop_distance(
+                previous_arc, current_arc, max_hops=max_hops
+            )
             if hops is None or hops > max_hops:
                 return unreachable_penalty
             score = -hop_penalty * max(0, hops - 1)

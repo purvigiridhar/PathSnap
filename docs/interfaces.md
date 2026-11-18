@@ -43,27 +43,28 @@ The joblib artifact stores the fitted preprocessing/model pipeline, positive lab
 
 The selected baseline is trained on labeled training candidates only. Student-test labels are used for development metrics only; evaluator labels are not used for training, model selection, or tuning.
 ## 3. Decoder (P3 produces, API consumes)
-Pass the full GPS track separately from the candidate table. The decoder returns
-one arc ID per original track row, using `None` where there are no candidates.
+The unchanged `decode(trip_candidates, scores, network)` receives one trip's
+candidate rows, one score per row in the same original order, and a directed
+`ArcGraph`. It requires `obs_idx`, `arc_id`, `t`, `x`, and `y`, reads no
+reference labels, and returns one arc ID or `None` per index in the inclusive
+range from minimum through maximum `obs_idx`. Internal observations without
+candidate rows are `None`; the decoder does not receive the full GPS track and
+cannot itself restore leading or trailing observations.
+
 `load_projected_network(trip_dir, crs)` returns projected nodes, directed arcs,
-and their CRS. Node and arc IDs are their original file row indices.
+and their CRS. Node and arc IDs are their original zero-based file row indices.
+`network` is constructed in the same projected metre-based CRS as candidate
+`x`/`y`.
 
-`network` is a directed `ArcGraph`, constructed from the trip's nodes and arcs
-using the same target CRS as the candidate x/y coordinates. The result covers
-the inclusive range from the minimum through maximum `obs_idx` in the candidate
-table. An observation with no candidate row between those bounds returns
-`None`. Leading and trailing observations with no candidate rows cannot be
-recovered without the original GPS track.
-
-The Stage 2 `reconstruct_trip()` adapter loads the full track and expands this
-candidate-range result to the original track length, using `None` for leading,
-internal, and trailing observations with no candidates. It invokes P1's
+The Stage 2 `reconstruct_trip()` adapter loads the full track, invokes P1's
 label-free `build_candidates_for_trip()` and `load_projected_network()` using
-the candidate table's `coord_crs`. P2's probability function is passed into the
-adapter and receives the P1 candidate rows with any `label` column removed.
-Scores must be one-dimensional, finite probabilities in `[0, 1]`, and remain
-aligned with the original candidate-row order. The adapter also removes
-`label` before calling the P3 decoder.
+the candidate table's `coord_crs`, then expands decoder output to the original
+track length. Leading, internal, and trailing observations without candidates
+are `None`; an entirely empty candidate table returns a full-length all-`None`
+list without calling P2. The adapter removes any `label` before passing rows
+to P2 and P3. Scores must be one-dimensional finite probabilities in `[0, 1]`
+and stay aligned to the original candidate-row order. Neither reference route
+nor labels are inputs to inference.
 
 ## 4. API (P4)
 `GET /trips` -> list of the ten evaluation trip IDs

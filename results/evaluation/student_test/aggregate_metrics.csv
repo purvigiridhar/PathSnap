@@ -1,0 +1,3 @@
+approach,observations,predicted,correct,incorrect,missing,candidate_reference_found,candidate_reference_misses,adjacent_pairs_with_predictions,directly_connected_pairs,network_reachable_pairs,disconnected_transitions,arc_accuracy,conditional_arc_accuracy,missing_rate,candidate_reference_coverage,direct_connectivity_rate,route_continuity_rate,disconnected_transition_rate,continuity_max_hops
+classifier_only,19160,19160,16452,2708,0,19092,68,19150,17764,18670,480,0.8586638830897704,0.8586638830897704,0.0,0.9964509394572025,0.9276240208877284,0.974934725848564,0.025065274151436032,5
+hmm,19160,19160,16934,2226,0,19092,68,19150,18699,19130,20,0.8838204592901879,0.8838204592901879,0.0,0.9964509394572025,0.9764490861618799,0.9989556135770234,0.0010443864229765013,5
