@@ -6,18 +6,31 @@ One row per (GPS observation, candidate arc). Saved as parquet in `data/processe
 | column | meaning |
 |---|---|
 | trip_id | trip identifier (group key for CV) |
-| obs_idx | 0-based index of the GPS point within the trip |
-| arc_id | candidate arc (0-based row index in the trip's `.arcs`) |
-| t | GPS observation timestamp in seconds |
-| x, y | GPS observation coordinates projected into metres |
-| coord_crs | Optional target CRS for x/y; when present it must match the network CRS |
+| obs_idx | Original 0-based GPS observation row index in the trip's `.track` |
+| arc_id | Original 0-based row index in the trip's `.arcs`; each row is a directed segment, with each direction represented by its own arc ID when both directions occur |
+| t | GPS observation timestamp in seconds, copied from `.track` |
+| x, y | GPS observation projected coordinates in metres |
+| coord_crs | CRS shared by the trip's projected GPS coordinates and network coordinates; use it to project network nodes for HMM transitions |
 | feat_* | engineered features (document each in `docs/features.md`) |
-| label | Optional training/dev target; never used by the decoder |
+| label | Reference-candidate target: 1 when `arc_id` matches the aligned reference arc for the observation, otherwise 0. Present only in offline training and student-test development data; never used by the decoder |
 
-P1's merged candidate builder currently projects x/y to EPSG:32632. If a
-candidate producer supplies `coord_crs`, it must identify the projected metric
-CRS used for x/y. The decoder requires scores aligned one-to-one with the
-candidate rows in their original order and ignores `label`.
+P1 aligns observations in file order to nondecreasing positions in the
+reference route by minimizing total point-to-segment distance; observations
+may repeat a route position or skip forward. Candidate generation and feature
+engineering use GPS and network files. An observation with no candidate arcs
+has no candidate row, so it cannot have a positive candidate label; partition
+miss summaries count such observations among all observations.
+
+The GPS positions, network nodes, and metric features for a trip use the same
+projected, metre-based CRS. `coord_crs` identifies that CRS and must agree
+between candidate coordinates and the network used by the decoder. Candidate
+rows and scores must remain aligned one-to-one in their original row order;
+attach scores before sorting or grouping by `obs_idx`. The decoder ignores
+`label`.
+
+Fit models on training trips only. Student-test labels are for offline
+development evaluation; prediction must use the label-free candidate builder.
+Evaluator references are reserved for final scoring.
 
 ## 2. Model (P2 produces, P3 and API consume)
 `model.predict_proba(X_features) -> np.ndarray` of shape (n_rows,) = P(candidate is correct).
